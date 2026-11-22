@@ -6,4 +6,5 @@ ClearLecture-Project.zip
 *.wav
 *.m4a
 *.mp3
-!tests/fixtures/*.m4a
+!tests/fixture.wav
+!tests/fixture.m4a
