@@ -1,0 +1,14 @@
+{
+  "name": "clearlecture-browser-voice-cleaner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A dependency-free, privacy-first in-browser classroom audio cleaner.",
+  "scripts": {
+    "dev":"node scripts/server.mjs",
+    "test":"node --test --test-isolation=none tests/*.test.mjs",
+    "test:e2e":"node scripts/e2e.mjs",
+    "bench:dsp":"node scripts/bench-dsp.mjs",
+    "build":"node scripts/build.mjs"
+  }
+}
