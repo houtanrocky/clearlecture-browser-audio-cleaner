@@ -21,6 +21,10 @@ npm run build
 
 Deploy the generated `dist/` directory as a static Pages site. In Cloudflare Pages, create a Pages project, choose the repository, set the build command to `npm run build`, and set the build output directory to `dist`. No Worker, Functions, environment variables, database, or audio service is needed. Direct Upload can publish the contents of `dist/`. Serve over HTTPS so WebCodecs, the service worker, and the save picker are available.
 
+### GitHub Pages
+
+The repository includes a GitHub Actions workflow at `.github/workflows/pages.yml`. It runs the unit suite, builds `dist/`, and deploys it to GitHub Pages on pushes to `main` (or by manual workflow dispatch). In the repository's **Settings → Pages**, choose **GitHub Actions** as the build and deployment source if it is not selected automatically. The site is served from the repository subpath; app assets and worker URLs are relative so this works without a custom domain. GitHub Pages does not apply Cloudflare's `_headers` file, so its response security headers differ; audio remains local and no server-side audio processing is used.
+
 ## Formats and browser behavior
 
 | Input | Support |
