@@ -22,7 +22,7 @@ if(!pickerAvailable)$('destination-option').hidden=true;
   if(!supported) {
     $('export-format').value='wav';
     $('export-format').querySelector('[value="opus"]').disabled=true;
-    $('format-help').textContent='Compact Opus export is unavailable in this browser. WAV is available.';
+    $('format-help').textContent='This browser exports mono WAV. Compact Opus is unavailable.';
   }
   if(!active)refreshEstimate();
   return supported;

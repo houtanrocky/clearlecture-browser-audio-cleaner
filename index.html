@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#faf8f4">
-  <meta name="description" content="ClearLecture | Clean up lecture recordings and save smaller audio files, privately in your browser.">
+  <meta name="description" content="ClearLecture | Reduce background noise and even out speech volume in lecture recordings.">
   <title>ClearLecture | Private Voice Cleanup</title>
   <link rel="stylesheet" href="./styles.css">
   <link rel="manifest" href="./manifest.webmanifest">
@@ -13,24 +13,23 @@
 </head>
 <body>
   <header class="top">
-    <a class="brand" href="./"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>ClearLecture</a>
-    <span class="private"><span aria-hidden="true"></span> Runs on your device</span>
+    <a class="brand" href="./"><img class="brand-mark" src="./favicon.svg" width="34" height="34" alt="">ClearLecture</a>
+    <span class="private"><span aria-hidden="true"></span> Files stay on your device</span>
   </header>
 
   <main>
-    <div class="hero">
-      <h1>Hear the lecture.<br><em>Keep the file small.</em></h1>
-      <p>Reduce background noise and even out speech volume | right in your browser.</p>
-    </div>
+    <header class="page-intro">
+      <h1>Clean up a recording</h1>
+      <p>Reduce background noise and even out speech volume.</p>
+    </header>
 
     <div class="workspace">
       <section class="panel source" aria-labelledby="source-title">
         <h2 id="source-title">Your recording</h2>
         <label class="drop" id="drop" for="audio-file" role="button" tabindex="0">
-          <span class="drop-icon" aria-hidden="true">+</span>
-          <strong>Choose a recording or drop it here</strong>
-          <span class="muted">AAC-LC M4A or uncompressed WAV</span>
-          <span class="choose">Browse files</span>
+          <span class="choose">Choose a file</span>
+          <span>or drop it here</span>
+          <span class="muted">M4A (AAC-LC) or uncompressed WAV</span>
           <input id="audio-file" type="file" accept=".m4a,.m4b,.mp4,.wav,audio/mp4,audio/wav" hidden>
         </label>
         <div class="file-info" id="file-info" hidden>
@@ -58,9 +57,9 @@
       <section class="panel treatment" aria-labelledby="treatment-title">
         <h2 id="treatment-title">Cleanup strength</h2>
         <div class="presets" role="group" aria-label="Strength preset">
-          <button class="preset" data-strength="0.28" type="button" aria-pressed="false"><strong>Gentle</strong><small>Preserve voice detail</small></button>
-          <button class="preset active" data-strength="0.52" type="button" aria-pressed="true"><strong>Balanced</strong><small>Reduce steady noise</small></button>
-          <button class="preset" data-strength="0.82" type="button" aria-pressed="false"><strong>Strong</strong><small>Reduce heavier noise</small></button>
+          <button class="preset" data-strength="0.28" type="button" aria-pressed="false"><strong>Gentle</strong><small>Light cleanup</small></button>
+          <button class="preset active" data-strength="0.52" type="button" aria-pressed="true"><strong>Balanced</strong><small>Everyday noise</small></button>
+          <button class="preset" data-strength="0.82" type="button" aria-pressed="false"><strong>Strong</strong><small>Louder background</small></button>
         </div>
         <details class="advanced">
           <summary>Advanced cleanup settings</summary>
@@ -86,9 +85,9 @@
           <option value="opus">Compact Opus (.ogg)</option>
           <option value="wav">Uncompressed WAV (.wav)</option>
         </select>
-        <p class="muted format-help" id="format-help">Opus saves space for listening and sharing. Choose WAV for an uncompressed copy.</p>
+        <p class="muted format-help" id="format-help">Both formats save mono audio. Use Opus for listening and sharing, or WAV for editing.</p>
         <p id="export-estimate" class="estimate" aria-live="polite"></p>
-        <label class="note-option" id="destination-option"><input type="checkbox" id="download-mode"> Use a browser download <span class="muted">By default, choose where to save the file.</span></label>
+        <label class="note-option" id="destination-option"><input type="checkbox" id="download-mode"> Use a browser download </label>
         <div class="actions">
           <button class="primary" type="button" id="start" disabled>Clean recording <span aria-hidden="true">→</span></button>
           <button id="cancel" type="button" class="secondary" hidden>Cancel</button>
@@ -99,7 +98,7 @@
           <p class="muted" id="detail"></p>
         </div>
         <div class="result" id="result" tabindex="-1" aria-labelledby="result-title" hidden>
-          <h3 id="result-title">Your cleaned recording is ready</h3>
+          <h3 id="result-title">Recording ready</h3>
           <p id="summary" class="muted"></p>
           <label for="preview">Audio preview</label>
           <audio id="preview" controls preload="none"></audio>
@@ -114,6 +113,6 @@
       </section>
     </div>
   </main>
-  <footer><span>ClearLecture | Private audio cleanup</span><a href="./README.md" target="_blank" rel="noopener">Project README</a></footer>
+  <footer><span>ClearLecture</span><a href="./README.md" target="_blank" rel="noopener">Documentation</a></footer>
 </body>
 </html>
