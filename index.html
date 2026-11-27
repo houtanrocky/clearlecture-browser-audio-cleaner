@@ -1,55 +1,119 @@
 <!doctype html>
-<html lang="en"><head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#101827" />
-  <meta name="description" content="Clean classroom recordings privately in your browser. No uploads, accounts or server." />
-  <title>ClearLecture — Private Voice Cleanup</title>
-  <link rel="stylesheet" href="./styles.css" />
-  <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-  <script defer type="module" src="./src/main.js"></script>
-</head><body>
-<div class="shell">
-  <header class="top"><a class="brand" href="./"><span class="brand-mark">◉</span><span>ClearLecture <small>LOCAL AUDIO STUDIO</small></span></a><span class="private"><span class="green-dot"></span> 100% on your device</span></header>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#faf8f4">
+  <meta name="description" content="ClearLecture | Clean up lecture recordings and save smaller audio files, privately in your browser.">
+  <title>ClearLecture | Private Voice Cleanup</title>
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <script type="module" src="./src/main.js"></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="./"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>ClearLecture</a>
+    <span class="private"><span aria-hidden="true"></span> Runs on your device</span>
+  </header>
+
   <main>
-    <div class="hero"><div class="eyebrow">VOICE FIRST · BACKGROUND NOISE LAST</div><h1>Make every lecture<br><em>easier to hear.</em></h1><p>Reduce classroom hiss, pen clicks, low-frequency handling noise and uneven volume — without uploading your recordings anywhere.</p></div>
-    <section class="panel">
-      <div class="panel-head"><div><span class="step">01 / SOURCE</span><h2>Your recording</h2></div><span class="hint">AAC-LC M4A · PCM WAV</span></div>
-      <label class="drop" id="drop" for="audio-file" tabindex="0"><span class="drop-icon">♫</span><strong id="drop-title">Choose a file or drop it here</strong><span id="drop-sub">Long recordings supported with streaming decode on compatible browsers</span><span class="choose">Browse files</span><input id="audio-file" type="file" accept=".m4a,.m4b,.mp4,.wav,audio/mp4,audio/wav" hidden /></label>
-      <div class="file-info" id="file-info" hidden><div><div class="name" id="file-name"></div><div class="muted" id="file-size"></div></div><button id="remove" class="link-btn" type="button">Remove</button></div>
-      <p id="analysis-status" class="analysis-status" role="status" aria-live="polite" hidden></p>
-      <div id="analysis-results" class="analysis-results" hidden><div class="analysis-title">Local sample check <span id="analysis-suggestion"></span></div><p id="analysis-summary" class="muted"></p><ul id="analysis-notes" class="analysis-notes"></ul><figure><canvas id="waveform" width="640" height="110" role="img" aria-label="Waveform summary of the middle audio sample"></canvas><figcaption>Middle sample · waveform min/max envelope</figcaption></figure><figure><canvas id="spectrum" width="640" height="110" role="img" aria-label="Relative frequency spectrum of the middle audio sample"></canvas><figcaption>Middle sample · relative spectral energy from low to high frequency</figcaption></figure><button id="apply-recommendation" class="secondary" type="button" hidden>Use suggested preset</button><p class="analysis-caveat">These are estimates from short samples, not a speech-quality score. Quiet-window level can include soft speech; hum and click candidates can be false positives.</p></div>
-    </section>
-    <section class="panel">
-      <div class="panel-head"><div><span class="step">02 / TREATMENT</span><h2>Noise cleanup</h2></div><span class="hint">Speech-preserving</span></div>
-      <div class="presets" role="group" aria-label="Strength preset">
-        <button class="preset" data-strength="0.28" type="button"><strong>Gentle</strong><small>Natural voice</small></button>
-        <button class="preset active" data-strength="0.52" type="button" aria-pressed="true"><strong>Balanced</strong><small>Recommended</small></button>
-        <button class="preset" data-strength="0.82" type="button"><strong>Strong</strong><small>More noise reduction</small></button>
-      </div>
-      <label class="channel-choice" for="channel-mode">Stereo to mono <select id="channel-mode"><option value="average">Average left and right</option><option value="left">Use left channel</option><option value="right">Use right channel</option></select></label>
-      <details class="advanced"><summary>Advanced processing controls</summary><fieldset><legend>Choose processing modules</legend>
-        <label><input type="checkbox" data-module="highpass" checked> Reduce rumble (85 Hz high-pass)</label>
-        <label><input type="checkbox" data-module="hum" checked> Reduce detected mains hum</label>
-        <label><input type="checkbox" data-module="clickRepair" checked> Repair isolated sample clicks</label>
-        <label><input type="checkbox" data-module="denoise" checked> Reduce steady background noise</label>
-        <label><input type="checkbox" data-module="leveling" checked> Level speech volume</label>
-        <label><input type="checkbox" data-module="limiter" checked> Soft peak compression (sample safety ceiling stays on)</label>
-        <label><input type="checkbox" data-module="lowpass" checked> Reduce high-frequency hiss</label>
-      </fieldset></details>
-      <p class="note">This tool uses classical DSP, not AI source separation. Loud sounds overlapping speech may remain; aggressive noise removal can make speech watery or metallic.</p>
-    </section>
-    <section class="panel export-panel">
-      <div class="panel-head"><div><span class="step">03 / EXPORT</span><h2>Clean & save</h2></div><span class="format">WAV · MONO · 16-BIT</span></div>
-      <p class="muted">Exports mono PCM16 WAV. On supported Chromium browsers, choose a save location for incremental disk writing. Browser download mode stores the whole output in memory and is unsuitable for long lectures.</p>
-      <label class="note-option"><input type="checkbox" id="download-mode" /> Use a browser download instead of selecting a save location (keeps the entire WAV in memory; use only for shorter files)</label>
-      <div class="actions"><button class="primary" type="button" id="start" disabled>Clean my recording <span>↗</span></button><button id="cancel" type="button" class="secondary" hidden>Cancel</button></div>
-      <div class="progress-wrap" id="progress-wrap" hidden><div class="progress-meta"><strong id="phase" aria-live="polite">Preparing…</strong><span id="percent">0%</span></div><div class="progress-bar" role="progressbar" aria-label="Audio cleanup progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="bar"></div></div><p class="muted" id="detail">Your file stays on this device.</p></div>
-      <div class="result" id="result" hidden><div class="result-title">✓ Cleaning complete</div><p id="summary" class="muted"></p><div class="result-buttons"><a id="download" class="download" hidden>Download cleaned WAV ↓</a><button type="button" id="ab-toggle" class="secondary" aria-pressed="false">Listen to original</button><button type="button" id="start-again" class="secondary">Process another recording</button></div><p id="report" class="muted"></p><label for="preview">A/B preview (switch keeps playback time)</label><audio id="preview" controls preload="none"></audio></div>
-      <div id="error" class="error" role="alert" hidden></div>
-    </section>
-    <section class="bottom-info"><div><h3>Private by design</h3><p>No file uploads, API keys, backend services, third-party trackers or subscriptions. All processing happens on your computer.</p></div><div><h3>Best for</h3><p>Single-speaker lectures, classroom recordings, podcasts, meetings and voice memos.</p></div><div><h3>Browser support</h3><p>Recent Chromium browsers are recommended for large M4A files and direct-to-disk WAV exports. Other browsers may have limited support.</p></div></section>
-  </main><footer><span>ClearLecture · Open-source starter project</span><a href="./README.md" target="_blank" rel="noopener">Project README</a></footer>
-</div>
-</body></html>
+    <div class="hero">
+      <h1>Hear the lecture.<br><em>Keep the file small.</em></h1>
+      <p>Reduce background noise and even out speech volume | right in your browser.</p>
+    </div>
+
+    <div class="workspace">
+      <section class="panel source" aria-labelledby="source-title">
+        <h2 id="source-title">Your recording</h2>
+        <label class="drop" id="drop" for="audio-file" role="button" tabindex="0">
+          <span class="drop-icon" aria-hidden="true">+</span>
+          <strong>Choose a recording or drop it here</strong>
+          <span class="muted">AAC-LC M4A or uncompressed WAV</span>
+          <span class="choose">Browse files</span>
+          <input id="audio-file" type="file" accept=".m4a,.m4b,.mp4,.wav,audio/mp4,audio/wav" hidden>
+        </label>
+        <div class="file-info" id="file-info" hidden>
+          <div><div class="name" id="file-name"></div><div class="muted" id="file-size"></div></div>
+          <button id="remove" class="link-btn" type="button">Remove</button>
+        </div>
+        <p id="analysis-status" class="analysis-status" role="status" hidden></p>
+        <div id="analysis-results" class="analysis-results" hidden>
+          <div class="analysis-title">
+            <div><h3>Recording check</h3><p id="analysis-summary" class="muted"></p></div>
+            <p id="analysis-suggestion" class="suggestion"></p>
+          </div>
+          <ul id="analysis-notes" class="analysis-notes"></ul>
+          <button id="apply-recommendation" class="secondary" type="button" hidden>Use suggested preset</button>
+          <details class="analysis-detail">
+            <summary>Waveform and measurements</summary>
+            <p id="analysis-measurements" class="muted"></p>
+            <figure><canvas id="waveform" width="640" height="110" role="img" aria-label="Waveform of the middle sample"></canvas><figcaption>Waveform of the middle sample</figcaption></figure>
+            <figure><canvas id="spectrum" width="640" height="110" role="img" aria-label="Frequency spectrum of the middle sample"></canvas><figcaption>Relative energy from low to high frequencies</figcaption></figure>
+            <p class="muted">Estimates come from short samples. Quiet sections can contain soft speech, and detected hum or clicks may be false positives.</p>
+          </details>
+        </div>
+      </section>
+
+      <section class="panel treatment" aria-labelledby="treatment-title">
+        <h2 id="treatment-title">Cleanup strength</h2>
+        <div class="presets" role="group" aria-label="Strength preset">
+          <button class="preset" data-strength="0.28" type="button" aria-pressed="false"><strong>Gentle</strong><small>Preserve voice detail</small></button>
+          <button class="preset active" data-strength="0.52" type="button" aria-pressed="true"><strong>Balanced</strong><small>Reduce steady noise</small></button>
+          <button class="preset" data-strength="0.82" type="button" aria-pressed="false"><strong>Strong</strong><small>Reduce heavier noise</small></button>
+        </div>
+        <details class="advanced">
+          <summary>Advanced cleanup settings</summary>
+          <label class="field channel-choice" for="channel-mode">Stereo to mono
+            <select id="channel-mode"><option value="average">Average left and right</option><option value="left">Use left channel</option><option value="right">Use right channel</option></select>
+          </label>
+          <fieldset><legend>Processing steps</legend>
+            <label><input type="checkbox" data-module="highpass" checked> Reduce rumble</label>
+            <label><input type="checkbox" data-module="hum" checked> Reduce steady hum</label>
+            <label><input type="checkbox" data-module="clickRepair" checked> Repair isolated clicks</label>
+            <label><input type="checkbox" data-module="denoise" checked> Reduce steady background noise</label>
+            <label><input type="checkbox" data-module="leveling" checked> Even out speech volume</label>
+            <label><input type="checkbox" data-module="limiter" checked> Soften volume peaks</label>
+            <label><input type="checkbox" data-module="lowpass" checked> Reduce high-frequency hiss</label>
+          </fieldset>
+        </details>
+      </section>
+
+      <section class="panel export-panel" aria-labelledby="export-title">
+        <h2 id="export-title">Save cleaned audio</h2>
+        <label class="field" for="export-format">File format</label>
+        <select id="export-format" aria-describedby="format-help">
+          <option value="opus">Compact Opus (.ogg)</option>
+          <option value="wav">Uncompressed WAV (.wav)</option>
+        </select>
+        <p class="muted format-help" id="format-help">Opus saves space for listening and sharing. Choose WAV for an uncompressed copy.</p>
+        <p id="export-estimate" class="estimate" aria-live="polite"></p>
+        <label class="note-option" id="destination-option"><input type="checkbox" id="download-mode"> Use a browser download <span class="muted">By default, choose where to save the file.</span></label>
+        <div class="actions">
+          <button class="primary" type="button" id="start" disabled>Clean recording <span aria-hidden="true">→</span></button>
+          <button id="cancel" type="button" class="secondary" hidden>Cancel</button>
+        </div>
+        <div class="progress-wrap" id="progress-wrap" hidden>
+          <div class="progress-meta"><strong id="phase" aria-live="polite">Preparing…</strong><span id="percent">0%</span></div>
+          <div class="progress-bar" role="progressbar" aria-label="Audio cleanup progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="bar"></div></div>
+          <p class="muted" id="detail"></p>
+        </div>
+        <div class="result" id="result" tabindex="-1" aria-labelledby="result-title" hidden>
+          <h3 id="result-title">Your cleaned recording is ready</h3>
+          <p id="summary" class="muted"></p>
+          <label for="preview">Audio preview</label>
+          <audio id="preview" controls preload="none"></audio>
+          <div class="result-buttons">
+            <a id="download" class="download" hidden>Download</a>
+            <button type="button" id="ab-toggle" class="secondary" aria-pressed="false">Listen to original</button>
+            <button type="button" id="start-again" class="link-btn">Start another recording</button>
+          </div>
+          <details><summary>Signal measurements</summary><p id="report" class="muted"></p></details>
+        </div>
+        <div id="error" class="error" role="alert" hidden></div>
+      </section>
+    </div>
+  </main>
+  <footer><span>ClearLecture | Private audio cleanup</span><a href="./README.md" target="_blank" rel="noopener">Project README</a></footer>
+</body>
+</html>

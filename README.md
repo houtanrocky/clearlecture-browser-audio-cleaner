@@ -1,4 +1,4 @@
-# ClearLecture — private, local lecture audio cleanup
+# ClearLecture | Private, local lecture audio cleanup
 
 ClearLecture is a static browser app for conservative cleanup of long, single-speaker classroom recordings. Audio stays in the browser. There is no upload endpoint, analytics, account, microphone capture, or third-party runtime dependency. A service worker caches the app shell after the first successful online load; audio files and output are never cached.
 
@@ -11,7 +11,7 @@ npm run dev
 # open http://localhost:4173 in recent Chrome or Edge
 ```
 
-The save picker writes output chunks directly to the destination file, one acknowledged chunk at a time. In browsers without the File System Access API, browser download mode builds a Blob in memory; the app requires explicit opt-in and refuses it when estimated WAV output exceeds 192 MiB. For long recordings use an up-to-date Chromium browser, an available destination with enough free space, and PCM WAV or a supported AAC-LC M4A.
+The save picker writes output chunks directly to the destination file, one acknowledged chunk at a time. In browsers without the File System Access API, browser download mode builds a Blob in memory; the app refuses it when estimated output exceeds 192 MiB. For long recordings use an up-to-date Chromium browser, an available destination with enough free space, and a PCM WAV or supported AAC-LC M4A source.
 
 ## Build and deploy to Cloudflare Pages
 
@@ -33,9 +33,9 @@ The repository includes a GitHub Actions workflow at `.github/workflows/pages.ym
 | AAC-LC in a conventional single-track M4A/MP4 | Progressive box scan, compact sample reads, WebCodecs `AudioDecoder` required |
 | MP3, Opus/WebM, ALAC, HE-AAC, DRM, fragmented MP4, RF64/BW64 | Not supported by the in-browser build; use the local FFmpeg path below |
 
-Output is mono PCM16 WAV. For input rates at or above 32 kHz the app outputs half the input rate (e.g. 48 kHz → 24 kHz); lower rates remain unchanged. This is intended for speech, not music mastering. Standard RIFF WAV has a 4 GB size limit. The app estimates output size and stops before processing if that limit would be exceeded.
+Compact Opus (.ogg) is the default on browsers with native Opus encoding and playback. The app targets 16 to 48 kbps based on the source size and duration, and shows an estimate before processing plus the measured size afterward. Already highly compressed sources can yield larger output. Choose WAV for uncompressed mono PCM16 or if your browser lacks Opus support. For even input rates at or above 32 kHz the cleanup stage outputs half the input rate (e.g. 48 kHz → 24 kHz); lower rates remain unchanged. This is intended for speech, not music mastering. Standard RIFF WAV has a 4 GB size limit. The app estimates output size and stops before processing if that limit would be exceeded.
 
-Long AAC is demuxed in small ranges from the local `File`; the complete encoded file is not read into one buffer. Decoded `AudioData` frames are mixed using the selected average/left/right mode and passed to the worker DSP. Worker output is transferred to the page and processing waits for a write acknowledgement before continuing, bounding queued output. File picker and WebCodecs support vary by browser. If the save picker is unavailable, memory export requires an explicit checkbox and is refused above the 192 MiB estimated WAV size.
+Long AAC is demuxed in small ranges from the local `File`; the complete encoded file is not read into one buffer. Decoded `AudioData` frames are mixed using the selected average/left/right mode and passed to the worker DSP. Worker output is transferred to the page and processing waits for a write acknowledgement before continuing, bounding queued output. File picker and WebCodecs support vary by browser. If the save picker is unavailable, the browser download path is used and is refused above the 192 MiB estimated output size.
 
 ### Known container caveat
 
@@ -49,11 +49,11 @@ On selection, the app analyzes short windows near the beginning, middle and end.
 
 The result report gives input/output sample peak and RMS plus the count of samples near full scale. These measurements do not establish intelligibility, true peak, clipping audibility, or noise-floor improvement. No post-clean sample analysis is claimed. Listen to original and cleaned audio with the time-preserving A/B switch. A click or chair sound directly overlapping speech may not be removable without also damaging the voice. Quiet speech is not intentionally gated or deleted.
 
-There is no de-reverb because this build does not have a defensible detector or implementation, no 24-bit export, configurable resampling or compressed browser output. MP3, Opus/WebM, ALAC, HE-AAC, DRM, fragmented MP4 and RF64/BW64 are not supported in-browser. Use the separate local FFmpeg script for those inputs. The unused MP3 parser experiment is not wired into the product and is not a supported format.
+There is no de-reverb because this build does not have a defensible detector or implementation, no 24-bit export or configurable resampling. MP3, Opus/WebM, ALAC, HE-AAC, DRM, fragmented MP4 and RF64/BW64 are not supported in-browser. Use the separate local FFmpeg script for those inputs. The unused MP3 parser experiment is not wired into the product and is not a supported format.
 
 ## Optional local FFmpeg batch path
 
-For compact AAC output or unsupported formats, run FFmpeg locally:
+For AAC output or formats the browser app cannot read, run FFmpeg locally:
 
 ```sh
 bash scripts/clean_ffmpeg.sh "original.m4a" "cleaned.m4a" balanced
@@ -74,7 +74,7 @@ The browser smoke requires Node 22+ plus an installed Microsoft Edge/Chrome/Chro
 
 For a reproducible streaming DSP-only benchmark, run `npm run bench:dsp -- 60` (or pass 90). It creates deterministic synthetic voice-like audio in small chunks and discards encoded output after counting it. A previous run on Windows build 26200 (AMD Ryzen 7 4800H, 16 logical CPUs, Node 24.18.0) completed in 47.15 seconds (76.35× real time); Node RSS rose from 46.9 MiB to 53.6 MiB, and the run emitted the expected 86.4 million 24 kHz samples. This measures the DSP and synthetic source generator only; it does not benchmark MP4 decoding, browser file writes, full-worker memory, or real classroom quality. The run script reports fresh measurements on the machine where it is executed.
 
-Tests use generated/synthetic fixtures only; no private classroom recordings are included. Unit tests cover FFT round trip, untreated STFT reconstruction, chunk-boundary invariance, alias suppression, click repair, silence/NaN handling, exact output lengths, WAV headers/downmix/stream reads, analysis metrics and the sample-table parser against the included synthetic M4A. `npm run test:e2e` runs a dependency-free Chromium/Edge DevTools Protocol smoke test (Node 22+ and a local browser required): it checks AAC→WAV decode, duration, sample bounds, download, WAV reopen, cancellation/retry, and absence of cross-origin requests. A real browser session completed the AAC analysis, cancel/retry and WAV fixture path. The standalone runner could not spawn Edge in the restricted environment (`EPERM`); run that command on an unrestricted workstation for the automated end-to-end report. The File System Access save picker and 60–90-minute browser runtime/memory have not been measured here. Do not interpret fixture checks as a long-file performance certification.
+Tests use generated/synthetic fixtures only; no private classroom recordings are included. Unit tests cover FFT round trip, untreated STFT reconstruction, chunk-boundary invariance, alias suppression, click repair, silence/NaN handling, exact output lengths, WAV headers/downmix/stream reads, analysis metrics and the sample-table parser against the included synthetic M4A. `npm run test:e2e` runs a dependency-free Chromium/Edge DevTools Protocol smoke test (Node 22+ and a local browser required): it checks smaller Opus export from AAC, playback duration, downloads, incremental file writes through a browser-backed test destination, AAC-to-WAV export, WAV reopen, cancellation/retry, mobile layout, and absence of cross-origin network requests. The native save dialog and 60 to 90 minute browser runtime and memory use are outside that test. Do not interpret fixture checks as a long-file performance certification.
 
 No full-pipeline runtime or memory target is claimed. A representative browser benchmark should record browser/version, OS, CPU/RAM, source duration/codec/rate/channels, wall time, peak process memory, output size, and verify duration/alignment and listening quality. The DSP-only result above cannot substitute for testing M4A decode and destination writes on long real recordings. The fixture suite is not a substitute for human A/B listening on varied classroom recordings.
 
@@ -83,6 +83,7 @@ No full-pipeline runtime or memory target is claimed. A representative browser b
 - `src/main.js`: accessible file flow, save/write acknowledgements, previews, cancellation and report
 - `src/worker.js`: WAV/M4A input, WebCodecs decode, bounded streaming DSP orchestration
 - `src/mp4.js`: minimal conventional AAC-LC MP4 demuxer
+- `src/opus.js`: WebCodecs speech encoding and streaming Ogg packaging
 - `src/wav.js`: streaming PCM WAV input and PCM16 RIFF output
 - `src/dsp.js`: FFT, overlap-add, filters, click repair, noise suppression, leveling, peak control and anti-alias resampling
 - `src/audio.js`: shared stereo-to-mono channel selection
@@ -95,4 +96,4 @@ No full-pipeline runtime or memory target is claimed. A representative browser b
 
 The starter already had a backend-free worker design, progressive MP4 sample reads, WAV streaming, a disk writer acknowledgement, and a small synthetic test set. The first test run passed all six original tests. This update adds module overrides, A/B preview, accurate exported-PCM peak/RMS metrics, RIFF bounds and extensible WAV handling, edit-list/priming alignment for a common AAC layout, explicit stereo channel choice, a windowed-sinc anti-alias resampler, static build/dev commands, offline app-shell caching, a guarded in-memory export fallback, and repeatable unit/browser smoke tests.
 
-Remaining production gaps: there is no true noise-floor or speech detector, no post-clean quality report, no MP3/Opus input or compressed browser output, no 24-bit export, and no measured full browser 60–90-minute decode/write run. The automated browser smoke uses Chromium's DevTools Protocol rather than the Playwright package. Direct-to-file free-space checks are not portable and remain the user's responsibility. Browser/OS may keep decoder-internal buffers beyond app control. Before relying on a particular recorder/browser combination, run the AAC fixture end-to-end, process a long non-private sample, check its duration/start/end, and listen to original/cleaned sections (including quiet speech and consonant-heavy passages) at matched playback level. These human and long-file checks have not been performed here. The app is a production-ready static release candidate for the explicitly supported path, with those device-specific release checks still outstanding.
+Remaining production gaps: there is no true noise-floor or speech detector, no post-clean quality report, no MP3/Opus input, no 24-bit export, and no measured full browser 60–90-minute decode/write run. The automated browser smoke uses Chromium's DevTools Protocol rather than the Playwright package. Direct-to-file free-space checks are not portable and remain the user's responsibility. Browser/OS may keep decoder-internal buffers beyond app control. Before relying on a particular recorder/browser combination, run the AAC fixture end-to-end, process a long non-private sample, check its duration/start/end, and listen to original/cleaned sections (including quiet speech and consonant-heavy passages) at matched playback level. These human and long-file checks have not been performed here. The app is a production-ready static release candidate for the explicitly supported path, with those device-specific release checks still outstanding.

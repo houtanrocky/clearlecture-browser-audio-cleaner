@@ -1,5 +1,5 @@
-const CACHE='clearlecture-static-v2';
-const ASSETS=['./','./index.html','./styles.css','./manifest.webmanifest','./favicon.svg','./src/main.js','./src/worker.js','./src/analysis.js','./src/audio.js','./src/dsp.js','./src/mp4.js','./src/wav.js'];
+const CACHE='clearlecture-static-v3';
+const ASSETS=['./','./index.html','./styles.css','./manifest.webmanifest','./favicon.svg','./src/main.js','./src/worker.js','./src/analysis.js','./src/audio.js','./src/dsp.js','./src/mp4.js','./src/wav.js','./src/opus.js'];
 const REQUIRED=ASSETS.filter(path=>!path.endsWith('.svg'));
 const CACHE_URLS=new Set(ASSETS.map(path=>new URL(path,self.location.href).href));
 self.addEventListener('install',event=>event.waitUntil((async()=>{

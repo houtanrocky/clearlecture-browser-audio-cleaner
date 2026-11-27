@@ -1,11 +1,12 @@
 import {readMp4Metadata,mp4SampleGroups,mp4SampleIndexAt} from './mp4.js';
 import {readWavMetadata,wavFloatGroups,readWavWindow} from './wav.js';
 import {VoiceProcessor} from './dsp.js';
+import {compactBitrate, opusConfig, OggOpusEncoder} from './opus.js';
 import {mixChannelFrame} from './audio.js';
 import {analyzeWindow,summarizeWindows} from './analysis.js';
 
-let running=false, cancelled=false, pending=0,processor=null,bytesWritten=0;
-let sampleRate=0, duration=0,resolveDrain=null,rawParts=0;
+let running=false, cancelled=false, pending=0,processor=null,bytesWritten=0,opus=null;
+let resolveDrain=null;
 const post=(type,detail={})=>self.postMessage({type,...detail});
 const analysisWindows=duration=>{
   const width=Math.min(2,Math.max(.25,duration)),last=Math.max(0,duration-width);
@@ -49,12 +50,10 @@ async function analyzeFile(file,channelMode='average') {
     } else if(['m4a','m4b','mp4'].includes(ext)) {
       if(typeof AudioDecoder==='undefined')throw new Error('WebCodecs AAC analysis is unavailable in this browser');
       meta=await readMp4Metadata(file);format='AAC-LC in M4A';
-      const lead=(meta.leadingSilenceFrames||0)/meta.sampleRate;
       for(const w of analysisWindows(meta.duration)) {
         if(cancelled)throw new Error('Cancelled');const audio=await decodeAnalysisWindow(file,meta,w.start,w.duration,channelMode);
         windows.push({...analyzeWindow(audio,meta.sampleRate),label:w.label});
       }
-      meta.duration=meta.duration;meta.analysisLeadingSilence=lead;
     } else throw new Error('Analysis supports PCM WAV and AAC-LC M4A/MP4 only.');
     if(cancelled)throw new Error('Cancelled');
     const analysis=summarizeWindows(windows,meta.sampleRate,meta.channels,format,meta.duration);
@@ -64,21 +63,38 @@ async function analyzeFile(file,channelMode='average') {
 function trackWrite(bytes) {
   // Browser main thread acknowledges file writes. Backpressure caps memory.
   bytesWritten+=bytes.byteLength;pending++;
-  self.postMessage({type:'pcm',data:bytes.buffer},[bytes.buffer]);
+  self.postMessage({type:'output',data:bytes.buffer},[bytes.buffer]);
 }
 async function drain(max=8) {
-  while(!cancelled && pending>max)await new Promise(resolve=>{
+  while(!cancelled && (pending>max || opus?.encoder.encodeQueueSize>4))await new Promise(resolve=>{
     resolveDrain=resolve;
     setTimeout(()=>{if(resolveDrain===resolve)resolveDrain=null;resolve();},40);
   });
   if(cancelled)throw new Error('Cancelled');
+  if(opus?.error)throw opus.error;
 }
-function startProcessor(rate, settings) {
+async function startProcessor(meta, settings, sourceBytes, format) {
+  const rate=meta.sampleRate;
   if(!Number.isFinite(rate)||rate<8000||rate>192000)throw new Error('Unsupported audio sample rate');
   const hum=settings.analysis?.humFrequency||0,humFrequencies=hum?[hum,hum*2,hum*3,hum*4].filter(f=>f<rate*.45):[];
-  processor=new VoiceProcessor(rate,{...settings,humFrequencies},trackWrite);
-  sampleRate=processor.outputRate;
+  processor=new VoiceProcessor(rate,{...settings,humFrequencies},bytes=>{
+    if(opus)opus.push(bytes);
+    else trackWrite(bytes);
+  });
+  const sampleRate=processor.outputRate;
+  let bitrate;
+  if(settings.exportFormat==='opus') {
+    bitrate=compactBitrate(sourceBytes,meta.duration);
+    const config=opusConfig(sampleRate,bitrate);
+    let supported=false;
+    try {supported=typeof AudioEncoder==='function'&&(await AudioEncoder.isConfigSupported(config)).supported;}catch{}
+    if(!supported) {
+      throw new Error('Compact export is unavailable for this recording in this browser. Choose WAV to continue.');
+    }
+    opus=new OggOpusEncoder(config,trackWrite);
+  }
   post('ready',{sampleRate});
+  post('details',{duration:meta.duration,channels:meta.channels,inputRate:rate,format,bitrate});
 }
 async function work(file,settings) {
   if(running)throw new Error('Already processing');
@@ -89,13 +105,12 @@ async function work(file,settings) {
     if(['m4a','mp4','m4b'].includes(extension)) {
       if(typeof AudioDecoder==='undefined')throw new Error('This browser lacks WebCodecs AudioDecoder. Use an updated Chrome, Edge or Safari on HTTPS/localhost.');
       post('phase',{message:'Reading M4A metadata'});
-      const meta=await readMp4Metadata(file);duration=meta.duration;
+      const meta=await readMp4Metadata(file);
       if(meta.channels<1||meta.channels>8)throw new Error('Unsupported channel count');
       const config={codec:meta.codec,sampleRate:meta.sampleRate,numberOfChannels:meta.channels,description:meta.asc};
       const support=await AudioDecoder.isConfigSupported(config);
       if(!support.supported)throw new Error('This browser cannot decode AAC-LC for this recording');
-      startProcessor(meta.sampleRate,settings);
-      post('details',{duration,channels:meta.channels,inputRate:meta.sampleRate,format:'AAC-LC in M4A'});
+      await startProcessor(meta,settings,file.size,'AAC-LC in M4A');
       let decoderError=null;
       let primingLeft=meta.mediaStartFrames||0,mediaFramesKept=0;
       const mediaFramesTarget=meta.playableFrames||Math.round(meta.duration*meta.sampleRate);
@@ -129,6 +144,7 @@ async function work(file,settings) {
         if(cancelled)throw new Error('Cancelled');
         if(decoderError)throw decoderError;
         for(const s of group.samples) {
+          await drain();
           while(decoder.decodeQueueSize>32) {
             await new Promise(r=>setTimeout(r,8));
             if(decoderError)throw decoderError;
@@ -148,11 +164,10 @@ async function work(file,settings) {
       }
     } else if(extension==='wav') {
       post('phase',{message:'Reading WAV header'});
-      const meta=await readWavMetadata(file);duration=meta.duration;
+      const meta=await readWavMetadata(file);
       if(meta.frames===0)throw new Error('This WAV contains no audio samples');
-      startProcessor(meta.sampleRate,settings);
-      post('details',{duration,channels:meta.channels,inputRate:meta.sampleRate,format:'PCM WAV'});
-      post('phase',{message:'Cleaning and exporting WAV'});
+      await startProcessor(meta,settings,file.size,'PCM WAV');
+      post('phase',{message:'Cleaning and exporting audio'});
       for await(const group of wavFloatGroups(file,meta,65536,settings.channelMode)) {
         if(cancelled)throw new Error('Cancelled');
         processor.push(group.mono);await drain();
@@ -161,11 +176,12 @@ async function work(file,settings) {
     } else throw new Error('Please use an AAC-LC M4A or uncompressed WAV. Other formats are not enabled in this dependency-free build.');
     if(cancelled)throw new Error('Cancelled');
     const report=processor.finish();
+    if(opus)await opus.finish();
     await drain(0);
     post('done',{report,bytesWritten});
   } catch(e) {
     post(cancelled?'cancelled':'error',{message:String(e?.message||e)});
-  } finally {try{decoder?.close();}catch{}running=false;}
+  } finally {try{decoder?.close();opus?.close();}catch{}opus=null;running=false;}
 }
 self.onmessage=event=>{
   const m=event.data;

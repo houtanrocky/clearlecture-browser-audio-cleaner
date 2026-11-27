@@ -28,7 +28,8 @@ class CDP {
 }
 async function evaluate(expr){return cdp.evaluate(expr);}
 async function waitAppDone(label){return until(async()=>evaluate(`(()=>{const done=!document.querySelector('#result').hidden;const error=!document.querySelector('#error').hidden;return done?{done:true}:error?{error:document.querySelector('#error').textContent}:null})()`),label);}
-async function injectFixture(){return evaluate(`(async()=>{const r=await fetch('/tests/fixture.m4a');if(!r.ok)throw new Error('fixture unavailable');const f=new File([await r.arrayBuffer()],'fixture.m4a',{type:'audio/mp4'});const d=new DataTransfer();d.items.add(f);const i=document.querySelector('#audio-file');i.files=d.files;i.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('#download-mode').checked=true;return true})()`);}
+async function waitReady(){await until(()=>evaluate("!document.querySelector('#start').disabled"),'recording analysis');}
+async function injectFixture(){return evaluate(`(async()=>{const r=await fetch('/tests/fixture.m4a');if(!r.ok)throw new Error('fixture unavailable');const f=new File([await r.arrayBuffer()],'fixture.m4a',{type:'audio/mp4'});const d=new DataTransfer();d.items.add(f);const i=document.querySelector('#audio-file');i.files=d.files;i.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('#download-mode').checked=true;return f.size})()`);}
 try {
   await until(async()=>{try{const r=await fetch(origin);return r.ok;}catch{return false;}},'local static server',10000);
   let version;
@@ -46,6 +47,10 @@ try {
   const attached=await rootCdp.send('Target.attachToTarget',{targetId,flatten:true});
   cdp=rootCdp;cdp.sessionId=attached.sessionId;
   await cdp.send('Page.enable',{},cdp.sessionId);await cdp.send('Runtime.enable',{},cdp.sessionId);
+  await cdp.send('Page.addScriptToEvaluateOnNewDocument',{source:`window.showSaveFilePicker=async options=>{
+    window.__clearlectureSaveOptions=options;
+    return (await navigator.storage.getDirectory()).getFileHandle(options.suggestedName,{create:true});
+  };`},cdp.sessionId);
   await cdp.send('Page.navigate',{url:origin},cdp.sessionId);
   await until(()=>evaluate(`document.readyState==='complete'&&!!document.querySelector('#start')`),'app page');
   await cdp.send('Network.enable',{},cdp.sessionId);
@@ -54,13 +59,49 @@ try {
   const feature=await evaluate(`({decoder:typeof AudioDecoder==='function',worker:typeof Worker==='function',picker:typeof showSaveFilePicker==='function'})`);
   if(!feature.decoder||!feature.worker)throw new Error(`Required browser capabilities missing: ${JSON.stringify(feature)}`);
 
-  await injectFixture();
+  const inputBytes=await injectFixture();
+  await waitReady();
+  if(await evaluate("document.querySelector('#export-format').value")!=='opus')throw new Error('Compact Opus is unavailable in the test browser.');
   await evaluate(`(()=>{document.querySelector('#start').click();document.querySelector('#cancel').click();return true})()`);
   await until(async()=>evaluate(`(()=>{const c=document.querySelector('#cancel').hidden;const p=document.querySelector('#progress-wrap').hidden;return c&&p?true:null})()`),'cancellation cleanup',10000);
   const afterCancel=await evaluate(`({resultHidden:document.querySelector('#result').hidden,startEnabled:!document.querySelector('#start').disabled,error:document.querySelector('#error').textContent})`);
   if(!afterCancel.resultHidden||!afterCancel.startEnabled||afterCancel.error)throw new Error(`Cancel state invalid: ${JSON.stringify(afterCancel)}`);
 
   await evaluate(`document.querySelector('#start').click()`);
+  const opusDone=await waitAppDone('compact Opus export');
+  if(opusDone.error)throw new Error('Compact export failed: '+opusDone.error);
+  const opus=await evaluate(`(async()=>{
+    const blob=await (await fetch(document.querySelector('#preview').src)).blob();
+    const bytes=await blob.arrayBuffer(),ctx=new AudioContext();
+    try {
+      const decoded=await ctx.decodeAudioData(bytes.slice(0));
+      const samples=decoded.getChannelData(0);
+      const rms=Math.sqrt(samples.reduce((sum,x)=>sum+x*x,0)/samples.length);
+      return {bytes:bytes.byteLength,type:blob.type,ogg:new DataView(bytes).getUint32(0)===0x4f676753,
+        name:document.querySelector('#download').download,duration:decoded.duration,channels:decoded.numberOfChannels,rms};
+    } finally {await ctx.close();}
+  })()`);
+  if(!opus.ogg||opus.type!=='audio/ogg'||opus.name!=='fixture_cleaned.ogg'||opus.bytes>=inputBytes||
+    opus.channels!==1||opus.rms<0.001||Math.abs(opus.duration-10)>0.025) {
+    throw new Error('Compact export checks failed: '+JSON.stringify({inputBytes,opus}));
+  }
+  await cdp.send('Page.setDownloadBehavior',{behavior:'allow',downloadPath:profile},cdp.sessionId);
+  await evaluate(`document.querySelector('#download').click()`);
+  await until(async()=>{try{return (await readFile(join(profile,opus.name))).length===opus.bytes;}catch{return false;}},'downloaded Opus file');
+  await evaluate(`document.querySelector('#download-mode').checked=false;document.querySelector('#start').click()`);
+  const saved=await waitAppDone('streaming Opus save');
+  if(saved.error)throw new Error('Streaming save failed: '+saved.error);
+  const direct=await evaluate(`(async()=>{
+    const name=window.__clearlectureSaveOptions.suggestedName;
+    const file=await (await (await navigator.storage.getDirectory()).getFileHandle(name)).getFile();
+    const download=await (await fetch(document.querySelector('#preview').src)).arrayBuffer();
+    return {name,bytes:file.size,previewBytes:download.byteLength,linkHidden:document.querySelector('#download').hidden};
+  })()`);
+  if(direct.name!==opus.name||direct.bytes!==opus.bytes||direct.previewBytes!==direct.bytes||!direct.linkHidden) {
+    throw new Error('Streaming export checks failed: '+JSON.stringify(direct));
+  }
+  await evaluate(`document.querySelector('#download-mode').checked=true`);
+  await evaluate(`document.querySelector('#export-format').value='wav';document.querySelector('#start').click()`);
   const completed=await waitAppDone('AAC fixture processing');
   if(completed.error)throw new Error(`AAC processing failed: ${completed.error}`);
   const metrics=await evaluate(`(async()=>{const bytes=await(await fetch(document.querySelector('#preview').src)).arrayBuffer();window.__clearlectureOutput=bytes;const view=new DataView(bytes);const context=new AudioContext();const decoded=await context.decodeAudioData(bytes.slice(0));const pcm=new Int16Array(bytes,44);let peak=0,rms=0;for(const sample of pcm){const x=sample/32768;peak=Math.max(peak,Math.abs(x));rms+=x*x;}await context.close();return {riff:view.getUint32(0,false)===0x52494646,wave:view.getUint32(8,false)===0x57415645,format:view.getUint16(20,true),channels:view.getUint16(22,true),rate:view.getUint32(24,true),bytes:bytes.byteLength,frames:pcm.length,duration:decoded.duration,decodedRate:decoded.sampleRate,peak,rms:Math.sqrt(rms/pcm.length)}})()`);
@@ -72,15 +113,24 @@ try {
   const downloaded=await until(async()=>{try{const b=await readFile(downloadedPath);return b.length===metrics.bytes?b:null;}catch{return null;}},'downloaded WAV file',10000);
   if(downloaded.readUInt32BE(0)!==0x52494646||downloaded.readUInt32BE(8)!==0x57415645)throw new Error('Downloaded file is not a RIFF/WAVE file.');
 
-  await evaluate(`(()=>{const f=new File([window.__clearlectureOutput],'reopened.wav',{type:'audio/wav'});const d=new DataTransfer();d.items.add(f);const i=document.querySelector('#audio-file');i.files=d.files;i.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('#download-mode').checked=true;document.querySelector('#start').click();return true})()`);
+  await evaluate(`(()=>{const f=new File([window.__clearlectureOutput],'reopened.wav',{type:'audio/wav'});const d=new DataTransfer();d.items.add(f);const i=document.querySelector('#audio-file');i.files=d.files;i.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('#download-mode').checked=true;return true})()`);
+  await waitReady();
+  await evaluate(`document.querySelector('#start').click()`);
   const wavDone=await waitAppDone('reopened WAV processing');
   if(wavDone.error)throw new Error(`Reopened WAV processing failed: ${wavDone.error}`);
   await evaluate(`(()=>{document.querySelector('#start-again').click();return true})()`);
 
   // No app network requests are necessary; the app fixture request is same-origin.
-  const network=cdp.events.slice(startEvents).filter(m=>m.method==='Network.requestWillBeSent').map(m=>m.params.request.url).filter(url=>new URL(url).origin!==origin);
+  const network=cdp.events.slice(startEvents).filter(m=>m.method==='Network.requestWillBeSent').map(m=>m.params.request.url).filter(url=>/^https?:/.test(url)&&new URL(url).origin!==origin);
   if(network.length)throw new Error(`Unexpected cross-origin requests: ${network.join(', ')}`);
-  console.log(JSON.stringify({browser:browserPath||externalCdp,capabilities:feature,cancelRetry:true,aacToWav:metrics,downloadBytes:downloaded.length,wavReopen:true,externalRequests:0},null,2));
+  await cdp.send('Emulation.setDeviceMetricsOverride',{width:360,height:800,deviceScaleFactor:1,mobile:true},cdp.sessionId);
+  const mobile=await evaluate(`(()=> {
+    const boxes=[...document.querySelectorAll('.panel')].map(panel=>panel.getBoundingClientRect());
+    return document.title.includes(' | ')&&document.documentElement.scrollWidth<=360&&
+      boxes[0].bottom<boxes[1].top&&boxes[1].bottom<boxes[2].top;
+  })()`);
+  if(!mobile)throw new Error('The mobile layout or page title is incorrect.');
+  console.log(JSON.stringify({browser:browserPath||externalCdp,capabilities:feature,cancelRetry:true,inputBytes,compactOpus:opus,streamingSave:direct,mobile,aacToWav:metrics,downloadBytes:downloaded.length,wavReopen:true,externalRequests:0},null,2));
 } finally {
   cdp?.close();
   if(browser&&!browser.killed){if(process.platform==='win32')spawnSync('taskkill',['/pid',String(browser.pid),'/t','/f'],{stdio:'ignore'});else browser.kill('SIGTERM');}
